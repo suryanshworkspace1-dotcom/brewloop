@@ -27,7 +27,9 @@ export default function AuthPage() {
         password,
       });
       if (error) setMessage(error.message);
-      else setMessage("Logged in successfully!");
+      else {
+        window.location.href = "/dashboard";
+      }
     }
 
     setLoading(false);
