@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowRight,
+  BadgeCheck,
   CalendarCheck,
   Coffee,
   Gift,
@@ -43,6 +44,75 @@ type VisitRow = {
   points_earned: number;
   created_at: string;
 };
+
+type RedemptionRow = {
+  id: string;
+  cafe_id: string;
+  reward_id: string;
+  points_spent: number;
+  created_at: string;
+  rewards: { reward_name: string }[];
+};
+
+async function fetchCustomerData(uid: string) {
+  const { data: loyaltyData } = await supabase
+    .from("loyalty_points")
+    .select("*")
+    .eq("user_id", uid);
+
+  const rows = loyaltyData ?? [];
+
+  const { data: visitData } = await supabase
+    .from("visits")
+    .select("*")
+    .eq("user_id", uid)
+    .order("created_at", { ascending: false })
+    .limit(12);
+
+  const visitsList = visitData ?? [];
+
+  const { data: redemptionData } = await supabase
+    .from("redemptions")
+    .select("id, cafe_id, reward_id, points_spent, created_at, rewards(reward_name)")
+    .eq("user_id", uid)
+    .order("created_at", { ascending: false });
+
+  const redemptionList = (redemptionData ?? []) as RedemptionRow[];
+
+  const loyaltyCafeIds = rows.map((r) => r.cafe_id);
+  const visitCafeIds = visitsList.map((v) => v.cafe_id);
+  const redemptionCafeIds = redemptionList.map((r) => r.cafe_id);
+  const cafeIds = [
+    ...new Set([...loyaltyCafeIds, ...visitCafeIds, ...redemptionCafeIds]),
+  ];
+
+  let cafeList: Cafe[] = [];
+  if (cafeIds.length > 0) {
+    const { data: cafeData } = await supabase
+      .from("cafes")
+      .select("id, cafe_name")
+      .in("id", cafeIds);
+    cafeList = cafeData ?? [];
+  }
+
+  const rewardCafeIds = [...new Set([...loyaltyCafeIds, ...redemptionCafeIds])];
+  let rewardList: Reward[] = [];
+  if (rewardCafeIds.length > 0) {
+    const { data: rewardData } = await supabase
+      .from("rewards")
+      .select("*")
+      .in("cafe_id", rewardCafeIds);
+    rewardList = rewardData ?? [];
+  }
+
+  return {
+    rows,
+    visitsList,
+    cafeList,
+    rewardList,
+    redemptionList,
+  };
+}
 
 function Section({
   title,
@@ -120,6 +190,11 @@ export default function CustomerPage() {
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [visits, setVisits] = useState<VisitRow[]>([]);
+  const [redemptions, setRedemptions] = useState<RedemptionRow[]>([]);
+  const [redeemingRewardId, setRedeemingRewardId] = useState<string | null>(
+    null
+  );
+  const [redeemError, setRedeemError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -139,6 +214,7 @@ export default function CustomerPage() {
           setCafes([]);
           setRewards([]);
           setVisits([]);
+          setRedemptions([]);
           setLoading(false);
         }
         return;
@@ -149,50 +225,14 @@ export default function CustomerPage() {
         setUserId(user.id);
       }
 
-      const { data: loyaltyData } = await supabase
-        .from("loyalty_points")
-        .select("*")
-        .eq("user_id", user.id);
-
-      const { data: visitData } = await supabase
-        .from("visits")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(12);
-
-      const rows = loyaltyData ?? [];
-      const visitsList = visitData ?? [];
-      const loyaltyCafeIds = rows.map((r) => r.cafe_id);
-      const visitCafeIds = visitsList.map((v) => v.cafe_id);
-      const cafeIds = [
-        ...new Set([...loyaltyCafeIds, ...visitCafeIds]),
-      ];
-
-      let cafeList: Cafe[] = [];
-      if (cafeIds.length > 0) {
-        const { data: cafeData } = await supabase
-          .from("cafes")
-          .select("id, cafe_name")
-          .in("id", cafeIds);
-        cafeList = cafeData ?? [];
-      }
-
-      const rewardCafeIds = [...new Set(loyaltyCafeIds)];
-      let rewardList: Reward[] = [];
-      if (rewardCafeIds.length > 0) {
-        const { data: rewardData } = await supabase
-          .from("rewards")
-          .select("*")
-          .in("cafe_id", rewardCafeIds);
-        rewardList = rewardData ?? [];
-      }
+      const d = await fetchCustomerData(user.id);
 
       if (!cancelled) {
-        setLoyaltyRows(rows);
-        setCafes(cafeList);
-        setRewards(rewardList ?? []);
-        setVisits(visitsList);
+        setLoyaltyRows(d.rows);
+        setCafes(d.cafeList);
+        setRewards(d.rewardList);
+        setVisits(d.visitsList);
+        setRedemptions(d.redemptionList);
         setLoading(false);
       }
     };
@@ -202,6 +242,30 @@ export default function CustomerPage() {
       cancelled = true;
     };
   }, []);
+
+  const refreshAfterRedeem = async (uid: string) => {
+    const d = await fetchCustomerData(uid);
+    setLoyaltyRows(d.rows);
+    setCafes(d.cafeList);
+    setRewards(d.rewardList);
+    setVisits(d.visitsList);
+    setRedemptions(d.redemptionList);
+  };
+
+  const handleRedeem = async (rewardId: string) => {
+    if (!userId) return;
+    setRedeemingRewardId(rewardId);
+    setRedeemError(null);
+    const { error } = await supabase.rpc("redeem_reward", {
+      p_reward_id: rewardId,
+    });
+    setRedeemingRewardId(null);
+    if (error) {
+      setRedeemError(error.message);
+      return;
+    }
+    await refreshAfterRedeem(userId);
+  };
 
   const pointsByCafe = useMemo(
     () => aggregatePointsByCafe(loyaltyRows),
@@ -361,6 +425,11 @@ export default function CustomerPage() {
         title="Rewards"
         description="What you can unlock at each cafe. Locked rewards show how many more points you need."
       >
+        {redeemError ? (
+          <p className="text-sm text-destructive" role="alert">
+            {redeemError}
+          </p>
+        ) : null}
         {!hasBalances ? (
           <Panel className="py-10 text-center text-sm text-muted-foreground">
             Earn points at a cafe to see rewards here.
@@ -402,7 +471,7 @@ export default function CustomerPage() {
                           <li
                             key={reward.id}
                             className={cn(
-                              "flex flex-col gap-1 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
+                              "flex flex-col gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center sm:justify-between",
                               eligible
                                 ? "border-primary/25 bg-primary/5"
                                 : "border-border bg-muted/30"
@@ -411,18 +480,33 @@ export default function CustomerPage() {
                             <span className="font-medium text-foreground">
                               {reward.reward_name}
                             </span>
-                            <span
-                              className={cn(
-                                "text-sm",
-                                eligible
-                                  ? "font-medium text-emerald-600 dark:text-emerald-400"
-                                  : "text-muted-foreground"
-                              )}
-                            >
-                              {eligible
-                                ? `Redeem · ${reward.points_required} pts`
-                                : `${need} more pts · ${reward.points_required} pts`}
-                            </span>
+                            <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:gap-3">
+                              <span
+                                className={cn(
+                                  "text-sm",
+                                  eligible
+                                    ? "font-medium text-emerald-600 dark:text-emerald-400"
+                                    : "text-muted-foreground"
+                                )}
+                              >
+                                {eligible
+                                  ? `Ready · ${reward.points_required} pts`
+                                  : `${need} more pts · ${reward.points_required} pts`}
+                              </span>
+                              {eligible ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="shrink-0"
+                                  disabled={redeemingRewardId === reward.id}
+                                  onClick={() => handleRedeem(reward.id)}
+                                >
+                                  {redeemingRewardId === reward.id
+                                    ? "Redeeming…"
+                                    : "Redeem"}
+                                </Button>
+                              ) : null}
+                            </div>
                           </li>
                         );
                       })}
@@ -433,6 +517,56 @@ export default function CustomerPage() {
             })}
           </div>
         )}
+      </Section>
+
+      <Section
+        title="Redeemed rewards"
+        description="Rewards you’ve claimed with your points, newest first."
+      >
+        <Panel>
+          {redemptions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
+              <BadgeCheck
+                className="size-8 text-muted-foreground/50"
+                aria-hidden
+              />
+              <p className="text-sm font-medium text-foreground">
+                No redemptions yet
+              </p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                When you redeem an eligible reward above, it will appear here
+                with the date and time.
+              </p>
+            </div>
+          ) : (
+            <ScrollArea className="h-[min(18rem,45vh)] pr-3">
+              <ul className="space-y-2">
+                {redemptions.map((r) => (
+                  <li
+                    key={r.id}
+                    className="flex flex-col gap-1 rounded-lg border border-border bg-muted/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0 space-y-0.5">
+                      <p className="font-medium text-foreground">
+                        {r.rewards[0]?.reward_name ?? "Reward"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {cafeNameById.get(r.cafe_id) ?? "Cafe"} ·{" "}
+                        {new Date(r.created_at).toLocaleString(undefined, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                      -{r.points_spent} pts
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </ScrollArea>
+          )}
+        </Panel>
       </Section>
 
       <Section
