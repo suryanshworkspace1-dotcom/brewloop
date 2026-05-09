@@ -358,7 +358,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="mt-4 flex justify-center rounded-lg bg-white p-3 ring-1 ring-border/60">
                     <QRCode
-                      value={`http://localhost:3000/checkin/${cafe.id}`}
+                      value={`${window.location.origin}/checkin/${cafe.id}`}
                       size={112}
                       className="h-auto w-full max-w-[7rem]"
                     />
