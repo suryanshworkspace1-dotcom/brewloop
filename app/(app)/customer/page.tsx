@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   CalendarCheck,
   Coffee,
+  Flame,
   Gift,
   MapPin,
   Sparkles,
@@ -24,6 +25,8 @@ type LoyaltyRow = {
   user_id: string;
   cafe_id: string;
   points: number;
+  streak_count: number;
+  last_streak_visit_date: string | null;
 };
 
 type Cafe = {
@@ -183,6 +186,20 @@ function aggregatePointsByCafe(rows: LoyaltyRow[]) {
   return map;
 }
 
+/** If multiple rows share a cafe, keep the highest streak (unexpected but safe). */
+function streakByCafe(rows: LoyaltyRow[]) {
+  const map = new Map<string, { streak: number; last: string | null }>();
+  for (const row of rows) {
+    const streak = row.streak_count ?? 0;
+    const last = row.last_streak_visit_date ?? null;
+    const cur = map.get(row.cafe_id);
+    if (!cur || streak > cur.streak) {
+      map.set(row.cafe_id, { streak, last });
+    }
+  }
+  return map;
+}
+
 export default function CustomerPage() {
   const [email, setEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -269,6 +286,11 @@ export default function CustomerPage() {
 
   const pointsByCafe = useMemo(
     () => aggregatePointsByCafe(loyaltyRows),
+    [loyaltyRows]
+  );
+
+  const visitStreakByCafe = useMemo(
+    () => streakByCafe(loyaltyRows),
     [loyaltyRows]
   );
 
@@ -394,29 +416,66 @@ export default function CustomerPage() {
           </Panel>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[...pointsByCafe.entries()].map(([cafeId, pts]) => (
-              <Panel key={cafeId} className="space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Coffee
-                        className="size-4 shrink-0 text-muted-foreground"
-                        aria-hidden
-                      />
-                      <h3 className="truncate font-semibold text-foreground">
-                        {cafeNameById.get(cafeId) ?? "Cafe"}
-                      </h3>
+            {[...pointsByCafe.entries()].map(([cafeId, pts]) => {
+              const streakInfo = visitStreakByCafe.get(cafeId);
+              const streak = streakInfo?.streak ?? 0;
+              return (
+                <Panel key={cafeId} className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Coffee
+                          className="size-4 shrink-0 text-muted-foreground"
+                          aria-hidden
+                        />
+                        <h3 className="truncate font-semibold text-foreground">
+                          {cafeNameById.get(cafeId) ?? "Cafe"}
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Available to redeem
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Available to redeem
-                    </p>
+                    <span className="shrink-0 rounded-lg bg-primary/10 px-2.5 py-1 text-lg font-semibold tabular-nums text-primary">
+                      {pts}
+                    </span>
                   </div>
-                  <span className="shrink-0 rounded-lg bg-primary/10 px-2.5 py-1 text-lg font-semibold tabular-nums text-primary">
-                    {pts}
-                  </span>
-                </div>
-              </Panel>
-            ))}
+                  <div className="flex items-start gap-2 rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-2">
+                    <Flame
+                      className="mt-0.5 size-4 shrink-0 text-orange-600 dark:text-orange-400"
+                      aria-hidden
+                    />
+                    <div className="min-w-0 space-y-0.5">
+                      {streak > 0 ? (
+                        <p className="text-sm text-foreground">
+                          <span className="font-semibold tabular-nums">
+                            {streak}
+                          </span>
+                          -day visit streak
+                          {streakInfo?.last ? (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              · last check-in{" "}
+                              {new Date(
+                                `${streakInfo.last}T12:00:00.000Z`
+                              ).toLocaleDateString(undefined, {
+                                dateStyle: "medium",
+                                timeZone: "UTC",
+                              })}
+                            </span>
+                          ) : null}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">
+                          No streak yet — check in on consecutive UTC days to
+                          build one.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Panel>
+              );
+            })}
           </div>
         )}
       </Section>

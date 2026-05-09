@@ -159,7 +159,29 @@ export default function CheckinPage() {
         ]);
       }
 
-      setMessage("Check-in successful! +10 points");
+      const { data: streakPayload, error: streakError } = await supabase.rpc(
+        "apply_checkin_visit_streak",
+        { p_cafe_id: cafeId }
+      );
+
+      let msg = "Check-in successful! +10 points.";
+      if (
+        !streakError &&
+        streakPayload &&
+        typeof streakPayload === "object" &&
+        "streak_count" in streakPayload
+      ) {
+        const n = Number(
+          (streakPayload as { streak_count: number }).streak_count
+        );
+        msg +=
+          n <= 1
+            ? " Day 1 of your visit streak."
+            : ` ${n}-day visit streak!`;
+      } else if (streakError) {
+        msg += " Points saved; streak could not be updated. Try again later.";
+      }
+      setMessage(msg);
     } finally {
       setSubmitting(false);
     }
