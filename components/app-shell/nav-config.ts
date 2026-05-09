@@ -1,4 +1,9 @@
-import { LayoutDashboard, Users, type LucideIcon } from "lucide-react"
+import {
+  BarChart3,
+  LayoutDashboard,
+  Users,
+  type LucideIcon,
+} from "lucide-react"
 
 export type NavItem = {
   href: string
@@ -20,6 +25,13 @@ export const MAIN_NAV: NavItem[] = [
     icon: LayoutDashboard,
     pageDescription:
       "Overview of your cafes, visits, and reward activity.",
+  },
+  {
+    href: "/analytics",
+    label: "Analytics",
+    icon: BarChart3,
+    pageDescription:
+      "Visit and loyalty metrics for each of your cafes.",
   },
   {
     href: "/customer",

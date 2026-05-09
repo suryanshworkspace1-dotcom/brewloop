@@ -112,11 +112,6 @@ export default function DashboardPage() {
   const [message, setMessage] = useState("");
   const [cafesLoading, setCafesLoading] = useState(true);
 
-  useEffect(() => {
-    getUser();
-    fetchCafes();
-  }, []);
-
   const getUser = async () => {
     const {
       data: { user },
@@ -125,22 +120,6 @@ export default function DashboardPage() {
     if (user) {
       setEmail(user.email || "");
     }
-  };
-
-  const fetchCafes = async () => {
-    setCafesLoading(true);
-    const { data } = await supabase.from("cafes").select("*");
-
-    if (data) {
-      setCafes(data);
-
-      if (data.length > 0) {
-        setSelectedCafe(data[0].id);
-        fetchRewards(data[0].id);
-        fetchLoyalty(data[0].id);
-      }
-    }
-    setCafesLoading(false);
   };
 
   const fetchRewards = async (cafeId: string) => {
@@ -164,6 +143,30 @@ export default function DashboardPage() {
       setLoyaltyData(data);
     }
   };
+
+  const fetchCafes = async () => {
+    setCafesLoading(true);
+    const { data } = await supabase.from("cafes").select("*");
+
+    if (data) {
+      setCafes(data);
+
+      if (data.length > 0) {
+        setSelectedCafe(data[0].id);
+        fetchRewards(data[0].id);
+        fetchLoyalty(data[0].id);
+      }
+    }
+    setCafesLoading(false);
+  };
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void getUser();
+      void fetchCafes();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only load
+  }, []);
 
   const createCafe = async () => {
     const {
