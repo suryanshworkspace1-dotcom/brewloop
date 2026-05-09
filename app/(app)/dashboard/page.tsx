@@ -1,6 +1,6 @@
-import QRCode from "react-qr-code";
 "use client";
 
+import QRCode from "react-qr-code";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
