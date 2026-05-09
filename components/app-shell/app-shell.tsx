@@ -2,8 +2,8 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useState } from "react"
-import { Coffee, LogIn, Menu } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Coffee, LogIn, LogOut, Menu } from "lucide-react"
 
 import { MainNav } from "./main-nav"
 import { getShellPageMeta } from "./nav-config"
@@ -26,11 +26,33 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { supabase } from "@/lib/supabase"
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { title, description } = getShellPageMeta(pathname)
+  const [email, setEmail] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setEmail(user.email ?? null)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setEmail(session?.user?.email ?? null)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const initials = email ? email[0].toUpperCase() : "G"
+  const displayName = email ?? "Guest"
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    window.location.href = "/auth"
+  }
 
   return (
     <div className="flex min-h-svh w-full bg-background">
@@ -107,27 +129,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <Avatar size="sm" className="size-7">
                   <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs font-medium">
-                    G
+                    {initials}
                   </AvatarFallback>
                 </Avatar>
                 <span className="hidden max-w-[8rem] truncate text-left text-sm font-medium sm:inline">
-                  Guest
+                  {displayName}
                 </span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52">
               <DropdownMenuLabel className="font-normal">
-                <span className="text-muted-foreground text-xs">
-                  Not signed in
+                <span className="text-muted-foreground text-xs truncate block">
+                  {email ?? "Not signed in"}
                 </span>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/auth" className="cursor-pointer gap-2">
-                  <LogIn className="size-4 opacity-70" aria-hidden />
-                  Sign in
-                </Link>
-              </DropdownMenuItem>
+              {email ? (
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="cursor-pointer gap-2 text-destructive focus:text-destructive"
+                >
+                  <LogOut className="size-4 opacity-70" aria-hidden />
+                  Sign out
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem asChild>
+                  <Link href="/auth" className="cursor-pointer gap-2">
+                    <LogIn className="size-4 opacity-70" aria-hidden />
+                    Sign in
+                  </Link>
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
