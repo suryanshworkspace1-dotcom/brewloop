@@ -2,10 +2,11 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 
 import { cn } from "@/lib/utils"
-
-import { MAIN_NAV } from "./nav-config"
+import { supabase } from "@/lib/supabase"
+import { getNavForRole } from "./nav-config"
 
 type MainNavProps = {
   onNavigate?: () => void
@@ -14,10 +15,25 @@ type MainNavProps = {
 
 export function MainNav({ onNavigate, className }: MainNavProps) {
   const pathname = usePathname()
+  const [role, setRole] = useState<"owner" | "customer">("customer")
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+      if (profile?.role === "owner") setRole("owner")
+    })
+  }, [])
+
+  const navItems = getNavForRole(role)
 
   return (
     <nav className={cn("flex flex-col gap-1 p-3", className)}>
-      {MAIN_NAV.map((item) => {
+      {navItems.map((item) => {
         const Icon = item.icon
         const isActive =
           pathname === item.href ||

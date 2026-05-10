@@ -1,7 +1,7 @@
 import {
   BarChart3,
   LayoutDashboard,
-  Users,
+  Coffee,
   type LucideIcon,
 } from "lucide-react"
 
@@ -9,10 +9,9 @@ export type NavItem = {
   href: string
   label: string
   icon: LucideIcon
-  /** Shown in the top bar; defaults to `label`. */
   pageTitle?: string
-  /** Subtitle under the top bar title. */
   pageDescription?: string
+  roles: ("owner" | "customer")[]
 }
 
 export const SHELL_DEFAULT_DESCRIPTION =
@@ -23,24 +22,28 @@ export const MAIN_NAV: NavItem[] = [
     href: "/dashboard",
     label: "Dashboard",
     icon: LayoutDashboard,
-    pageDescription:
-      "Overview of your cafes, visits, and reward activity.",
+    pageDescription: "Overview of your cafes, visits, and reward activity.",
+    roles: ["owner"],
   },
   {
     href: "/analytics",
     label: "Analytics",
     icon: BarChart3,
-    pageDescription:
-      "Visit and loyalty metrics for each of your cafes.",
+    pageDescription: "Visit and loyalty metrics for each of your cafes.",
+    roles: ["owner"],
   },
   {
     href: "/customer",
-    label: "Customer",
-    icon: Users,
-    pageDescription:
-      "Preview the loyalty experience your customers see.",
+    label: "My Loyalty",
+    icon: Coffee,
+    pageDescription: "Your points, rewards, and visit history.",
+    roles: ["customer"],
   },
 ]
+
+export function getNavForRole(role: "owner" | "customer") {
+  return MAIN_NAV.filter((item) => item.roles.includes(role))
+}
 
 export function getShellPageMeta(pathname: string): {
   title: string
