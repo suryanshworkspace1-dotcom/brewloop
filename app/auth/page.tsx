@@ -28,7 +28,9 @@ export default function AuthPage() {
       });
       if (error) setMessage(error.message);
       else {
-        window.location.href = "/dashboard";
+        setTimeout(() => {
+          window.location.replace("/dashboard");
+        }, 500);
       }
     }
 
