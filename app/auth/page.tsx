@@ -28,9 +28,18 @@ export default function AuthPage() {
       });
       if (error) setMessage(error.message);
       else {
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user!.id)
+          .single()
+        
+        const role = profile?.role ?? "customer"
+        
         setTimeout(() => {
-          window.location.replace("/dashboard");
-        }, 500);
+          window.location.replace(role === "owner" ? "/dashboard" : "/customer")
+        }, 500)
       }
     }
 

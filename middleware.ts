@@ -22,13 +22,37 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const protectedRoutes = ["/dashboard", "/analytics", "/customer"]
-  const isProtected = protectedRoutes.some((route) =>
-    request.nextUrl.pathname.startsWith(route)
-  )
+  const { pathname } = request.nextUrl
 
-  if (isProtected && !user) {
-    return NextResponse.redirect(new URL("/auth", request.url))
+  // Not logged in → redirect to auth
+  if (!user) {
+    const protectedRoutes = ["/dashboard", "/analytics", "/customer"]
+    const isProtected = protectedRoutes.some((route) =>
+      pathname.startsWith(route)
+    )
+    if (isProtected) {
+      return NextResponse.redirect(new URL("/auth", request.url))
+    }
+    return response
+  }
+
+  // Get user role
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single()
+
+  const role = profile?.role ?? "customer"
+
+  // Owner trying to access customer page → redirect to dashboard
+  if (role === "owner" && pathname.startsWith("/customer")) {
+    return NextResponse.redirect(new URL("/dashboard", request.url))
+  }
+
+  // Customer trying to access owner pages → redirect to customer
+  if (role === "customer" && (pathname.startsWith("/dashboard") || pathname.startsWith("/analytics"))) {
+    return NextResponse.redirect(new URL("/customer", request.url))
   }
 
   return response
