@@ -28,6 +28,8 @@ export default function AuthPage() {
       });
       if (error) setMessage(error.message);
       else {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
         const { data: { user } } = await supabase.auth.getUser()
         const { data: profile } = await supabase
           .from("profiles")
@@ -37,9 +39,7 @@ export default function AuthPage() {
         
         const role = profile?.role ?? "customer"
         
-        setTimeout(() => {
-          window.location.replace(role === "owner" ? "/dashboard" : "/customer")
-        }, 500)
+        window.location.replace(role === "owner" ? "/dashboard" : "/customer")
       }
     }
 
