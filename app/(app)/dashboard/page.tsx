@@ -100,7 +100,6 @@ function DashboardSkeleton() {
 
 export default function DashboardPage() {
   const [email, setEmail] = useState("");
-  const [cafeName, setCafeName] = useState("");
   const [cafes, setCafes] = useState<Cafe[]>([]);
   const [selectedCafe, setSelectedCafe] = useState("");
   const [rewardName, setRewardName] = useState("");
@@ -116,10 +115,7 @@ export default function DashboardPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-
-    if (user) {
-      setEmail(user.email || "");
-    }
+    if (user) setEmail(user.email || "");
   };
 
   const fetchRewards = async (cafeId: string) => {
@@ -127,10 +123,7 @@ export default function DashboardPage() {
       .from("rewards")
       .select("*")
       .eq("cafe_id", cafeId);
-
-    if (data) {
-      setRewards(data);
-    }
+    if (data) setRewards(data);
   };
 
   const fetchLoyalty = async (cafeId: string) => {
@@ -138,19 +131,14 @@ export default function DashboardPage() {
       .from("loyalty_points")
       .select("*")
       .eq("cafe_id", cafeId);
-
-    if (data) {
-      setLoyaltyData(data);
-    }
+    if (data) setLoyaltyData(data);
   };
 
   const fetchCafes = async () => {
     setCafesLoading(true);
     const { data } = await supabase.from("cafes").select("*");
-
     if (data) {
       setCafes(data);
-
       if (data.length > 0) {
         setSelectedCafe(data[0].id);
         fetchRewards(data[0].id);
@@ -165,28 +153,8 @@ export default function DashboardPage() {
       void getUser();
       void fetchCafes();
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const createCafe = async () => {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { error } = await supabase.from("cafes").insert([
-      {
-        owner_id: user.id,
-        cafe_name: cafeName,
-      },
-    ]);
-
-    if (!error) {
-      setCafeName("");
-      fetchCafes();
-    }
-  };
 
   const createReward = async () => {
     const { error } = await supabase.from("rewards").insert([
@@ -196,7 +164,6 @@ export default function DashboardPage() {
         points_required: Number(pointsRequired),
       },
     ]);
-
     if (!error) {
       setRewardName("");
       setPointsRequired("");
@@ -206,7 +173,6 @@ export default function DashboardPage() {
 
   const addPoints = async () => {
     const { data: users } = await supabase.auth.admin.listUsers();
-
     const foundUser = users?.users?.find((u) => u.email === customerEmail);
 
     if (!foundUser) {
@@ -267,37 +233,8 @@ export default function DashboardPage() {
       <Separator />
 
       <Section
-        title="Add a cafe"
-        description="Create a location customers can check in to and earn points."
-      >
-        <Panel>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="min-w-0 flex-1 space-y-2">
-              <label htmlFor="cafe-name" className="text-sm font-medium">
-                Cafe name
-              </label>
-              <Input
-                id="cafe-name"
-                placeholder="e.g. Northside Roasters"
-                value={cafeName}
-                onChange={(e) => setCafeName(e.target.value)}
-              />
-            </div>
-            <Button
-              className="shrink-0 gap-1.5"
-              onClick={createCafe}
-              disabled={!cafeName.trim()}
-            >
-              <Plus className="size-4" aria-hidden />
-              Create cafe
-            </Button>
-          </div>
-        </Panel>
-      </Section>
-
-      <Section
-        title="Your cafes"
-        description="Select a cafe to manage rewards, QR check-in, and loyalty."
+        title="Your cafe"
+        description="Manage your cafe QR code, rewards and loyalty."
       >
         {!hasCafes ? (
           <Panel className="flex flex-col items-center justify-center gap-3 py-12 text-center">
@@ -305,10 +242,9 @@ export default function DashboardPage() {
               <Store className="size-6 text-muted-foreground" aria-hidden />
             </div>
             <div className="max-w-sm space-y-1">
-              <p className="font-medium text-foreground">No cafes yet</p>
+              <p className="font-medium text-foreground">No cafe assigned yet</p>
               <p className="text-sm text-muted-foreground">
-                Add your first cafe above. You&apos;ll get a QR code for
-                customer check-in.
+                Contact BrewLoop to get your cafe set up.
               </p>
             </div>
           </Panel>
@@ -440,16 +376,12 @@ export default function DashboardPage() {
               </p>
             ) : rewards.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-                <Gift
-                  className="size-8 text-muted-foreground/50"
-                  aria-hidden
-                />
+                <Gift className="size-8 text-muted-foreground/50" aria-hidden />
                 <p className="text-sm font-medium text-foreground">
                   No rewards yet
                 </p>
                 <p className="max-w-xs text-sm text-muted-foreground">
-                  Create a reward on the left. It will show up here for this
-                  cafe.
+                  Create a reward on the left.
                 </p>
               </div>
             ) : (
@@ -553,7 +485,7 @@ export default function DashboardPage() {
 
       <Section
         title="Loyalty ledger"
-        description="Point entries recorded for the selected cafe."
+        description="Point entries recorded for your cafe."
       >
         <Panel>
           <div className="mb-4 flex items-center gap-2">
@@ -566,16 +498,12 @@ export default function DashboardPage() {
             </p>
           ) : loyaltyData.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
-              <Users
-                className="size-8 text-muted-foreground/50"
-                aria-hidden
-              />
+              <Users className="size-8 text-muted-foreground/50" aria-hidden />
               <p className="text-sm font-medium text-foreground">
                 No entries yet
               </p>
               <p className="max-w-xs text-sm text-muted-foreground">
-                When you award points or customers check in, rows will appear
-                here.
+                When you award points or customers check in, rows will appear here.
               </p>
             </div>
           ) : (
